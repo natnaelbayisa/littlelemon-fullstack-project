@@ -1,0 +1,189 @@
+{% extends 'base.html' %} {% load static %} {% block content %}
+<section>
+  <article>
+    <!--Begin row-->
+    <div class="row">
+      <!--Begin col-->
+      <div class="column">
+        <h1>Make A Reservation</h1>
+        <form action="" method="post">
+          {% csrf_token %} {{form.as_p}}
+          <input type="submit" id="button" />
+        </form>
+      </div>
+
+      <div class="column">
+        <h1>Bookings for <span id="bookings-date"></span></h1>
+        <pre id="bookings"></pre>
+      </div>
+      <!--End col-->
+
+      <!--Begin col-->
+      <div class="column">
+        <div class="videowrap">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d11898.289517452584!2d-87.60853049433447!3d41.79442860243028!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x880e2912ce6f7027%3A0xc0cfb5545d4a37b2!2sHyde%20Park%2C%20Chicago%2C%20IL%2C%20USA!5e0!3m2!1sen!2spt!4v1662384760663!5m2!1sen!2spt"
+            width="600"
+            height="450"
+            style="border: 0"
+            allowfullscreen=""
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+      </div>
+      <!--End col-->
+    </div>
+    <!--End row-->
+  </article>
+</section>
+
+<script>
+  // helper functions
+  function prefixWithZero(string, numberOfZeros) {
+    var zeros = "";
+    for (let i = 0; i < numberOfZeros; i++) {
+      zeros += "0";
+    }
+    return zeros + string;
+  }
+
+  function formatDayOrMonth(DayOrMonthAsString) {
+    string_length = DayOrMonthAsString.length;
+    if (string_length < 2) {
+      return prefixWithZero(DayOrMonthAsString, 1);
+    }
+    return DayOrMonthAsString;
+  }
+
+  function getDateAsTuple() {
+    date = new Date();
+    return [
+      formatDayOrMonth(String(date.getDate())),
+      formatDayOrMonth(String(date.getMonth() + 1)),
+      String(date.getFullYear()),
+    ];
+  }
+
+  function getDateAsString() {
+    date = new Date();
+    var output = "";
+    output += String(date.getFullYear()) + "-";
+    output += formatDayOrMonth(String(date.getMonth() + 1)) + "-";
+    output += formatDayOrMonth(String(date.getDate()));
+    return output;
+  }
+
+  function getDateFromInput() {
+    var input_date = document.getElementById("id_reservation_date").value;
+    return input_date;
+  }
+
+  function disableBookedSlot(data, key) {
+    const option = document.querySelectorAll(
+      `option[value='${data[key]["reservation_slot"]}']`
+    );
+    option[0].setAttribute("disabled", "");
+  }
+
+  function enableAllSlots() {
+    const options = document.querySelectorAll("option");
+    for (let key in options) {
+      try {
+        options[key].removeAttribute("disabled");
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  function listBookingsOnPage(data) {
+    enableAllSlots();
+
+    const pre = document.getElementById("bookings");
+    pre.innerHTML = "";
+
+    if (data["message"] === "No Booking") {
+      const message = document.createTextNode("No Bookings");
+      const strong = document.createElement("strong");
+      const p = document.createElement("p");
+
+      strong.appendChild(message);
+      p.appendChild(strong);
+      pre.appendChild(p);
+    } else {
+      for (let key in data) {
+        disableBookedSlot(data, key);
+
+        var content = "";
+        const p = document.createElement("p");
+
+        content += data[key]["first_name"] + " at ";
+        content += data[key]["reservation_slot"];
+
+        p.appendChild(document.createTextNode(content));
+        pre.appendChild(p);
+      }
+    }
+  }
+
+  function fetchBookings() {
+    var query_date = getDateFromInput();
+
+    span.innerHTML = "";
+    span = document.getElementById("bookings-date");
+    span.appendChild(document.createTextNode(query_date));
+
+    // fetch bookings from the api
+    fetch(`http://127.0.0.1:8000/bookings-api?date=${query_date}`)
+      .then((response) => response.json())
+      .then((data) => {
+        listBookingsOnPage(data);
+      });
+  }
+
+  function changeButtonState() {
+    const slot = document.getElementById("id_reservation_slot");
+    const name = document.getElementById("id_first_name");
+
+    const button = document.getElementById("button");
+
+    if (slot.value === "-- Select the time --" || name.value === "") {
+      button.setAttribute("disabled", "");
+    } else {
+      button.removeAttribute("disabled");
+    }
+  }
+
+  function setSlotDefaultOptionAttr(slot) {
+    const option = document.createElement("option");
+    option.innerHTML = "-- Select the time --";
+    option.setAttribute("disabled", "");
+    option.setAttribute("selected", "");
+    option.setAttribute("hidden", "");
+    slot.appendChild(option);
+  }
+
+  // form
+  var date = (document.getElementById("id_reservation_date").type = "date");
+  const time = (document.getElementById("id_reservation_slot").type = "time");
+
+  // show bookings for selected date
+  date = document.getElementById("id_reservation_date");
+  date.addEventListener("input", fetchBookings);
+
+  // submit button only enable when time and name are entered
+  const slot = document.getElementById("id_reservation_slot");
+  const first_name = document.getElementById("id_first_name");
+  setSlotDefaultOptionAttr(slot);
+  slot.addEventListener("input", changeButtonState);
+  first_name.addEventListener("change", changeButtonState);
+
+  // fetch bookings from api endpoint at page loading
+  var span = document.getElementById("bookings-date");
+  fetchBookings();
+
+  // on first load, disable submit button
+  changeButtonState();
+</script>
+{% endblock %}
